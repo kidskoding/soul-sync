@@ -74,7 +74,7 @@ Mixed-model approach to balance quality and cost:
 |---|---|---|---|
 | Interview Engine | GPT-4o | `claude-sonnet-4-6` | Conversational quality, cost-efficient |
 | Twin Conversation Orchestrator | GPT-4o | `claude-sonnet-4-6` | Core product — quality matters |
-| Scoring Agent | GPT-4o | `claude-haiku-4-5` | Single structured call, simpler task |
+| Scoring Agent | GPT-4o | `claude-sonnet-4-6` | Nuanced personality analysis requires depth |
 | Personality Embeddings | `text-embedding-3-small` | `text-embedding-3-small` | No change — Claude has no embeddings API |
 
 ---
@@ -166,7 +166,7 @@ const response = await client.chat.completions.create({
 #### After (Anthropic)
 ```typescript
 const response = await client.messages.create({
-  model: "claude-haiku-4-5",
+  model: "claude-sonnet-4-6",
   max_tokens: 4096,
   messages,
   output_config: {
@@ -278,8 +278,8 @@ Use **Supabase Database Webhooks** to call `/api/conversations/step` whenever a 
 |---|---|---|---|
 | Interview (15 turns) | Sonnet 4.6 | ~3K in / ~1.5K out | ~$0.03 |
 | Twin conversation (20 exchanges) | Sonnet 4.6 | ~4K in / ~2K out | ~$0.04 |
-| Scoring | Haiku 4.5 | ~3K in / ~0.5K out | ~$0.006 |
-| **Total per match** | | | **~$0.08** |
+| Scoring | Sonnet 4.6 | ~3K in / ~0.5K out | ~$0.02 |
+| **Total per match** | | | **~$0.09** |
 
 $10 in credits ≈ **~125 full match cycles** for development and testing.
 
