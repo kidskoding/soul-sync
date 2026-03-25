@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, conversations, interview, matching, photos, profile, swipes
+from app.routers import auth, conversations, interview, matching, photos, profile, scoring, swipes
 
 app = FastAPI(title="SoulSync API", version="0.1.0")
 
@@ -13,6 +13,7 @@ app.include_router(matching.router, prefix="/api/matching", tags=["matching"])
 app.include_router(photos.router, prefix="/api/photos", tags=["photos"])
 app.include_router(swipes.router, prefix="/api/swipes", tags=["swipes"])
 app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
+app.include_router(scoring.router, prefix="/api/scoring", tags=["scoring"])
 
 app.add_middleware(
     CORSMiddleware,
