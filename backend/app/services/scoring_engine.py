@@ -144,4 +144,13 @@ def run_scoring(sb: Client, anthropic_client: Anthropic, match_id: str) -> dict:
     new_status = "revealed" if overall >= MATCH_THRESHOLD else "scored"
     sb.table("matches").update({"status": new_status}).eq("id", match_id).execute()
 
+    # Trigger reflection for both users (non-critical, don't block scoring)
+    try:
+        from app.services.reflection_agent import reflect_on_conversation
+
+        reflect_on_conversation(sb, anthropic_client, match_id, match.data["user_a_id"])
+        reflect_on_conversation(sb, anthropic_client, match_id, match.data["user_b_id"])
+    except Exception:
+        pass
+
     return {**scores, "overall": overall, "status": new_status}
