@@ -1,5 +1,5 @@
 import json
-from anthropic import Anthropic
+from openai import OpenAI
 
 
 MONITOR_SYSTEM = """Evaluate this dating conversation's trajectory. Assess:
@@ -32,24 +32,31 @@ MONITOR_SCHEMA = {
 }
 
 
-def evaluate_conversation(client: Anthropic, messages: list[dict]) -> dict:
+def evaluate_conversation(client: OpenAI, messages: list[dict]) -> dict:
     """Evaluate conversation health. Called every 5 messages."""
     transcript = "\n".join(
         f"{'Person A' if m['speaker'] == 'twin_a' else 'Person B'}: {m['message']}"
         for m in messages
     )
 
-    response = client.messages.create(
-        model="claude-haiku-4-5",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=500,
-        system=MONITOR_SYSTEM,
-        messages=[{"role": "user", "content": transcript}],
-        output_config={
-            "format": {"type": "json_schema", "schema": MONITOR_SCHEMA},
+        messages=[
+            {"role": "system", "content": MONITOR_SYSTEM},
+            {"role": "user", "content": transcript},
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "conversation_monitor",
+                "schema": MONITOR_SCHEMA,
+                "strict": True,
+            },
         },
     )
 
-    text = response.content[0].text if response.content[0].type == "text" else "{}"
+    text = response.choices[0].message.content or "{}"
     try:
         return json.loads(text)
     except json.JSONDecodeError:

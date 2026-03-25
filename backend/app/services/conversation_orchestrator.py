@@ -1,6 +1,6 @@
 import asyncio
 import json
-from anthropic import Anthropic
+from openai import OpenAI
 from supabase import Client
 
 from app.services.conversation_monitor import evaluate_conversation, should_check
@@ -10,29 +10,28 @@ CONVERSATION_CONTEXT = """You are having a getting-to-know-you conversation with
 
 
 def generate_twin_message(
-    client: Anthropic,
+    client: OpenAI,
     system_prompt: str,
     history: list[dict],
     speaker: str,
 ) -> str:
     """Generate one twin message."""
-    # Map history to Claude messages format
-    messages = []
+    messages = [{"role": "system", "content": f"{system_prompt}\n\n{CONVERSATION_CONTEXT}"}]
+
     for msg in history:
         role = "assistant" if msg["speaker"] == speaker else "user"
         messages.append({"role": role, "content": msg["message"]})
 
-    if not messages:
+    if len(messages) == 1:  # Only system message, no history
         messages.append({"role": "user", "content": "Say hi and introduce yourself naturally."})
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=300,
-        system=f"{system_prompt}\n\n{CONVERSATION_CONTEXT}",
         messages=messages,
     )
 
-    return response.content[0].text if response.content[0].type == "text" else ""
+    return response.choices[0].message.content or ""
 
 
 def load_conversation_history(sb: Client, match_id: str) -> list[dict]:
@@ -42,7 +41,7 @@ def load_conversation_history(sb: Client, match_id: str) -> list[dict]:
 
 
 def run_conversation_step(
-    sb: Client, anthropic_client: Anthropic, match_id: str
+    sb: Client, openai_client: OpenAI, match_id: str
 ) -> dict:
     """Run one exchange in the conversation. Returns {"done": bool, "turn": int}."""
     # Load session
@@ -74,7 +73,7 @@ def run_conversation_step(
 
         # Load history and generate message
         history = load_conversation_history(sb, match_id)
-        message = generate_twin_message(anthropic_client, profile.data["system_prompt"], history, speaker)
+        message = generate_twin_message(openai_client, profile.data["system_prompt"], history, speaker)
 
         # Write message (triggers Supabase Realtime)
         sb.table("conversations").insert({
@@ -90,7 +89,7 @@ def run_conversation_step(
         # Monitor check every 5 messages
         if should_check(new_turn):
             all_messages = load_conversation_history(sb, match_id)
-            eval_result = evaluate_conversation(anthropic_client, all_messages)
+            eval_result = evaluate_conversation(openai_client, all_messages)
 
             if eval_result.get("recommendation") in (
                 "escalate_to_meetup",

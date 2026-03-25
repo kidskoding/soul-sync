@@ -2,7 +2,7 @@
 
 import json
 
-from anthropic import Anthropic
+from openai import OpenAI
 from supabase import Client
 
 
@@ -32,19 +32,22 @@ def find_candidates_by_embedding(sb: Client, user_id: str, limit: int = 50) -> l
 
 
 def validate_with_lite_llm(
-    client: Anthropic, soul_md_a: str, soul_md_b: str
+    client: OpenAI, soul_md_a: str, soul_md_b: str
 ) -> dict:
     """Stage 2: Lite LLM quick-check for dealbreaker conflicts."""
-    response = client.messages.create(
-        model="claude-haiku-4-5",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=300,
-        system=(
-            "You are a compatibility pre-screener. Given two dating profiles, "
-            "decide if they're worth a full conversation. Check for dealbreaker "
-            "conflicts, major lifestyle mismatches, and obvious incompatibilities. "
-            "Be quick and decisive."
-        ),
         messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a compatibility pre-screener. Given two dating profiles, "
+                    "decide if they're worth a full conversation. Check for dealbreaker "
+                    "conflicts, major lifestyle mismatches, and obvious incompatibilities. "
+                    "Be quick and decisive."
+                ),
+            },
             {
                 "role": "user",
                 "content": (
@@ -53,15 +56,12 @@ def validate_with_lite_llm(
                     "Are these two worth a full conversation? "
                     'Respond with JSON: {"pass": true/false, "reason": "one sentence"}'
                 ),
-            }
+            },
         ],
+        response_format={"type": "json_object"},
     )
 
-    text = (
-        response.content[0].text
-        if response.content[0].type == "text"
-        else '{"pass": false, "reason": "error"}'
-    )
+    text = response.choices[0].message.content or '{"pass": false, "reason": "error"}'
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -69,7 +69,7 @@ def validate_with_lite_llm(
 
 
 def run_matching_pipeline(
-    sb: Client, anthropic_client: Anthropic, user_id: str
+    sb: Client, openai_client: OpenAI, user_id: str
 ) -> list[dict]:
     """Run full matching pipeline: embedding -> lite LLM -> match records."""
     # Stage 1: embedding similarity search
@@ -104,7 +104,7 @@ def run_matching_pipeline(
             continue
 
         result = validate_with_lite_llm(
-            anthropic_client, user_soul_md, cand_profile.data["soul_md"]
+            openai_client, user_soul_md, cand_profile.data["soul_md"]
         )
 
         # Record candidate evaluation

@@ -7,7 +7,7 @@ Protected by a webhook secret header so only trusted callers
 from fastapi import APIRouter, Header, HTTPException
 
 from app.config import settings
-from app.deps import get_anthropic, get_openai, get_supabase
+from app.deps import get_openai, get_supabase
 from app.services.swipe_analyzer import run_batch_analysis
 
 router = APIRouter()
@@ -20,7 +20,6 @@ async def analyze_swipes_cron(x_webhook_secret: str = Header(default="")):
         raise HTTPException(status_code=401, detail="Invalid secret")
 
     sb = get_supabase()
-    anthropic_client = get_anthropic()
     openai_client = get_openai()
-    results = run_batch_analysis(sb, anthropic_client, openai_client)
+    results = run_batch_analysis(sb, openai_client)
     return {"processed": len(results), "results": results}

@@ -7,7 +7,6 @@ embedding so future matches reflect learned tastes.
 
 import json
 
-from anthropic import Anthropic
 from openai import OpenAI
 from supabase import Client
 
@@ -42,7 +41,7 @@ ANALYSIS_SCHEMA = {
 
 
 def analyze_swipes(
-    sb: Client, anthropic_client: Anthropic, openai_client: OpenAI, user_id: str
+    sb: Client, openai_client: OpenAI, user_id: str
 ) -> dict:
     """Analyze a user's swipe history and update their SOUL.MD preferences."""
     # Load swipes
@@ -77,17 +76,24 @@ def analyze_swipes(
     prompt = "RIGHT SWIPES (liked):\n" + "\n---\n".join(right_profiles[:10])
     prompt += "\n\nLEFT SWIPES (passed):\n" + "\n---\n".join(left_profiles[:10])
 
-    response = anthropic_client.messages.create(
-        model="claude-haiku-4-5",
+    response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=1000,
-        system=ANALYSIS_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-        output_config={
-            "format": {"type": "json_schema", "schema": ANALYSIS_SCHEMA},
+        messages=[
+            {"role": "system", "content": ANALYSIS_SYSTEM},
+            {"role": "user", "content": prompt},
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "swipe_analysis",
+                "schema": ANALYSIS_SCHEMA,
+                "strict": True,
+            },
         },
     )
 
-    text = response.content[0].text if response.content[0].type == "text" else "{}"
+    text = response.choices[0].message.content or "{}"
     preferences = json.loads(text)
 
     # Update SOUL.MD preferences
@@ -126,7 +132,7 @@ def analyze_swipes(
 
 
 def run_batch_analysis(
-    sb: Client, anthropic_client: Anthropic, openai_client: OpenAI
+    sb: Client, openai_client: OpenAI
 ) -> list[dict]:
     """Run swipe analysis for all users with sufficient swipe data."""
     users = (
@@ -134,6 +140,6 @@ def run_batch_analysis(
     )
     results = []
     for user in users.data or []:
-        result = analyze_swipes(sb, anthropic_client, openai_client, user["id"])
+        result = analyze_swipes(sb, openai_client, user["id"])
         results.append({"user_id": user["id"], **result})
     return results

@@ -3,7 +3,7 @@ and updates SOUL.MD learnings for future match improvement."""
 
 import json
 
-from anthropic import Anthropic
+from openai import OpenAI
 from supabase import Client
 
 
@@ -29,23 +29,9 @@ REFLECTION_SCHEMA = {
 
 
 def reflect_on_conversation(
-    sb: Client, anthropic_client: Anthropic, match_id: str, user_id: str
+    sb: Client, openai_client: OpenAI, match_id: str, user_id: str
 ) -> dict:
-    """Analyze a completed conversation and update SOUL.MD learnings.
-
-    Loads the conversation transcript and compatibility scores, sends them
-    to Claude for reflection analysis, then merges the new learnings with
-    existing learnings in the user's soul profile.
-
-    Args:
-        sb: Supabase client.
-        anthropic_client: Anthropic API client.
-        match_id: The match whose conversation to reflect on.
-        user_id: The user whose soul profile learnings to update.
-
-    Returns:
-        The newly extracted learnings dict, or an error dict.
-    """
+    """Analyze a completed conversation and update SOUL.MD learnings."""
     # Load conversation
     messages = (
         sb.table("conversations")
@@ -80,17 +66,24 @@ def reflect_on_conversation(
             f"humor={scores.data['humor_compatibility']}"
         )
 
-    response = anthropic_client.messages.create(
-        model="claude-haiku-4-5",
+    response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=500,
-        system=REFLECTION_SYSTEM,
-        messages=[{"role": "user", "content": f"{transcript}{score_summary}"}],
-        output_config={
-            "format": {"type": "json_schema", "schema": REFLECTION_SCHEMA},
+        messages=[
+            {"role": "system", "content": REFLECTION_SYSTEM},
+            {"role": "user", "content": f"{transcript}{score_summary}"},
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "conversation_reflection",
+                "schema": REFLECTION_SCHEMA,
+                "strict": True,
+            },
         },
     )
 
-    text = response.content[0].text if response.content[0].type == "text" else "{}"
+    text = response.choices[0].message.content or "{}"
     new_learnings = json.loads(text)
 
     # Merge with existing learnings

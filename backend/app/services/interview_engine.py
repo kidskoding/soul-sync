@@ -1,10 +1,10 @@
-"""Interview engine service powered by Claude Sonnet 4.6.
+"""Interview engine service powered by GPT-4o.
 
 Drives the onboarding conversation that captures a user's personality,
 values, communication style, and preferences for twin generation.
 """
 
-from anthropic import Anthropic
+from openai import OpenAI
 
 INTERVIEW_SYSTEM_PROMPT = """You are an empathetic, warm interviewer helping someone create their dating profile on SoulSync. Ask ONE question at a time. Be conversational, not clinical. React naturally to their answers before asking the next question.
 
@@ -24,28 +24,28 @@ Keep your messages warm and under 3 sentences."""
 
 
 def get_interview_response(
-    client: Anthropic,
+    client: OpenAI,
     messages: list[dict],
 ) -> tuple[str, bool]:
     """Generate the next interview question/response.
 
     Args:
-        client: Anthropic API client.
-        messages: Full conversation history in Claude message format
-                  (alternating user/assistant roles).
+        client: OpenAI API client.
+        messages: Full conversation history (alternating user/assistant roles).
 
     Returns:
         Tuple of (response_text, is_complete) where is_complete is True
         when the interview has gathered enough information.
     """
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    openai_messages = [{"role": "system", "content": INTERVIEW_SYSTEM_PROMPT}] + messages
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=500,
-        system=INTERVIEW_SYSTEM_PROMPT,
-        messages=messages,
+        messages=openai_messages,
     )
 
-    text = response.content[0].text if response.content[0].type == "text" else ""
+    text = response.choices[0].message.content or ""
     is_complete = "create your digital twin" in text.lower()
 
     return text, is_complete

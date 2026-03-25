@@ -1,6 +1,6 @@
 import asyncio
 from fastapi import APIRouter, Depends, BackgroundTasks
-from app.deps import get_supabase, get_anthropic
+from app.deps import get_supabase, get_openai
 from app.routers.auth import get_current_user_id
 from app.services.conversation_orchestrator import (
     generate_twin_message,
@@ -14,20 +14,20 @@ router = APIRouter()
 
 async def run_conversation_loop(match_id: str):
     """Background task: run the full twin conversation with natural pacing."""
-    from app.deps import get_supabase, get_anthropic
+    from app.deps import get_supabase, get_openai
     sb = get_supabase()
-    anthropic_client = get_anthropic()
+    openai_client = get_openai()
 
     while True:
-        result = run_conversation_step(sb, anthropic_client, match_id)
+        result = run_conversation_step(sb, openai_client, match_id)
         if result.get("done"):
             # If completed successfully, trigger scoring
             if not result.get("error"):
                 try:
                     from app.services.scoring_engine import run_scoring
-                    run_scoring(sb, anthropic_client, match_id)
+                    run_scoring(sb, openai_client, match_id)
                 except ImportError:
-                    pass  # Scoring not implemented yet
+                    pass
             break
         await asyncio.sleep(2.5)  # Natural pacing between messages
 
@@ -39,7 +39,7 @@ async def start_conversation(
     user_id: str = Depends(get_current_user_id),
 ):
     sb = get_supabase()
-    anthropic_client = get_anthropic()
+    openai_client = get_openai()
 
     # Verify match exists and user is part of it
     match = sb.table("matches").select("*").eq("id", req.match_id).single().execute()
@@ -61,7 +61,7 @@ async def start_conversation(
     }).execute()
 
     # Generate first message (Twin A opens)
-    first_message = generate_twin_message(anthropic_client, profile_a.data["system_prompt"], [], "twin_a")
+    first_message = generate_twin_message(openai_client, profile_a.data["system_prompt"], [], "twin_a")
 
     # Write first message
     sb.table("conversations").insert({

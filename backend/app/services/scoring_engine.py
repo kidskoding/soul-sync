@@ -1,8 +1,8 @@
-"""Compatibility scoring engine using Claude structured output."""
+"""Compatibility scoring engine using OpenAI structured output."""
 
 import json
 
-from anthropic import Anthropic
+from openai import OpenAI
 from supabase import Client
 
 SCORING_SYSTEM = """You are a relationship compatibility analyst. Analyze this conversation between two potential partners and score their compatibility across five dimensions.
@@ -67,11 +67,11 @@ def format_transcript(messages: list[dict]) -> str:
     )
 
 
-def run_scoring(sb: Client, anthropic_client: Anthropic, match_id: str) -> dict:
+def run_scoring(sb: Client, openai_client: OpenAI, match_id: str) -> dict:
     """Score a completed conversation between two digital twins.
 
     Loads the conversation transcript and both twin profiles, sends them to
-    Claude for multi-dimensional compatibility analysis, persists the scores,
+    GPT-4o for multi-dimensional compatibility analysis, persists the scores,
     and updates the match status based on the threshold.
     """
     # Load conversation messages
@@ -110,17 +110,24 @@ def run_scoring(sb: Client, anthropic_client: Anthropic, match_id: str) -> dict:
         f"Conversation:\n{transcript}"
     )
 
-    response = anthropic_client.messages.create(
-        model="claude-sonnet-4-6",
+    response = openai_client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=2048,
-        system=SCORING_SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-        output_config={
-            "format": {"type": "json_schema", "schema": SCORING_SCHEMA},
+        messages=[
+            {"role": "system", "content": SCORING_SYSTEM},
+            {"role": "user", "content": prompt},
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "compatibility_scores",
+                "schema": SCORING_SCHEMA,
+                "strict": True,
+            },
         },
     )
 
-    text = response.content[0].text if response.content[0].type == "text" else "{}"
+    text = response.choices[0].message.content or "{}"
     scores = json.loads(text)
 
     overall = compute_overall(scores)
@@ -148,8 +155,8 @@ def run_scoring(sb: Client, anthropic_client: Anthropic, match_id: str) -> dict:
     try:
         from app.services.reflection_agent import reflect_on_conversation
 
-        reflect_on_conversation(sb, anthropic_client, match_id, match.data["user_a_id"])
-        reflect_on_conversation(sb, anthropic_client, match_id, match.data["user_b_id"])
+        reflect_on_conversation(sb, openai_client, match_id, match.data["user_a_id"])
+        reflect_on_conversation(sb, openai_client, match_id, match.data["user_b_id"])
     except Exception:
         pass
 

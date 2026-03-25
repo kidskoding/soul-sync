@@ -8,7 +8,7 @@ exchanges are persisted to the soul_profiles table.
 
 from fastapi import APIRouter, Depends
 
-from app.deps import get_anthropic, get_supabase
+from app.deps import get_openai, get_supabase
 from app.models.soul import InterviewRequest, InterviewResponse
 from app.routers.auth import get_current_user_id
 from app.services.interview_engine import get_interview_response
@@ -21,27 +21,19 @@ async def chat(
     req: InterviewRequest,
     user_id: str = Depends(get_current_user_id),
 ):
-    """Process a single turn of the onboarding interview.
-
-    Appends the user's latest message to the conversation history,
-    generates the interviewer's next response via Claude, and — when the
-    interview is complete — saves the full exchange to the database.
-    """
-    client = get_anthropic()
+    """Process a single turn of the onboarding interview."""
+    client = get_openai()
     full_messages = [*req.messages, {"role": "user", "content": req.user_message}]
 
     text, is_complete = get_interview_response(client, full_messages)
 
     if is_complete:
         sb = get_supabase()
-        # Build exchange data from conversation.
-        # Messages alternate: user, assistant, user, assistant, ...
-        # We pair each assistant question with the following user answer.
         exchanges = []
         for i in range(0, len(full_messages), 2):
             q = full_messages[i]["content"] if i < len(full_messages) else ""
             a = full_messages[i + 1]["content"] if i + 1 < len(full_messages) else ""
-            if a:  # Only add if there's an answer
+            if a:
                 exchanges.append({"question": q, "answer": a, "dimension": "auto"})
 
         sb.table("soul_profiles").upsert(

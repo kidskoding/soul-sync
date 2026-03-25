@@ -7,7 +7,6 @@ embedding vector for pgvector-based matching.
 
 import json
 
-from anthropic import Anthropic
 from openai import OpenAI
 
 
@@ -23,6 +22,7 @@ PERSONALITY_SCHEMA = {
                 "love_language": {"type": "string"},
             },
             "required": ["directness", "conflict_approach", "love_language"],
+            "additionalProperties": False,
         },
         "lifestyle": {
             "type": "object",
@@ -38,6 +38,7 @@ PERSONALITY_SCHEMA = {
                 "interests",
                 "ideal_weekend",
             ],
+            "additionalProperties": False,
         },
         "dealbreakers": {"type": "array", "items": {"type": "string"}},
         "humor_style": {"type": "string"},
@@ -59,26 +60,34 @@ PERSONALITY_SCHEMA = {
 }
 
 
-def extract_personality(client: Anthropic, interview_data: dict) -> dict:
+def extract_personality(client: OpenAI, interview_data: dict) -> dict:
     """Extract structured personality from interview transcript."""
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=4096,
-        system=(
-            "Extract a structured personality profile from this interview "
-            "transcript. Be specific and use the person's own words where possible."
-        ),
         messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Extract a structured personality profile from this interview "
+                    "transcript. Be specific and use the person's own words where possible."
+                ),
+            },
             {
                 "role": "user",
                 "content": json.dumps(interview_data.get("exchanges", [])),
-            }
+            },
         ],
-        output_config={
-            "format": {"type": "json_schema", "schema": PERSONALITY_SCHEMA},
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "personality_profile",
+                "schema": PERSONALITY_SCHEMA,
+                "strict": True,
+            },
         },
     )
-    text = response.content[0].text if response.content[0].type == "text" else "{}"
+    text = response.choices[0].message.content or "{}"
     return json.loads(text)
 
 
@@ -164,7 +173,6 @@ def generate_embedding(client: OpenAI, text: str) -> list[float]:
 
 
 def generate_full_soul_profile(
-    anthropic_client: Anthropic,
     openai_client: OpenAI,
     name: str,
     interview_data: dict,
@@ -177,7 +185,7 @@ def generate_full_soul_profile(
       3. Generate the twin's system prompt (drives twin conversations)
       4. Generate a personality embedding (for pgvector matching)
     """
-    personality = extract_personality(anthropic_client, interview_data)
+    personality = extract_personality(openai_client, interview_data)
     soul_md = generate_soul_md(name, personality)
     system_prompt = generate_system_prompt(name, personality)
     embedding_text = personality_to_embedding_text(personality)

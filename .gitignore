@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+backend/venv/
+.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Next.js
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+CLAUDE.md
+memory.md
+learnings.md
+
+# Plans/specs (internal docs)
+docs/plans/
+PLAN.md
+SPEC.md
+PROGRESS.md
